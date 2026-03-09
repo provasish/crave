@@ -2,7 +2,7 @@
 
 rm -rf .repo/local_manifests
 
-repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs
+repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs --depth=1
 
 /opt/crave/resync.sh
 
