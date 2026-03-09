@@ -24,7 +24,7 @@ git clone https://github.com/EvoX-Spartan/proprietary_vendor_realme_spartan vend
 git clone https://github.com/EvoX-Spartan/proprietary_vendor_realme_sm8250-common vendor/realme/sm8250-common --depth=1
 
 # Kernel Tree
-git clone https://github.com/EvoX-Spartan/android_kernel_realme_sm8250 kernel/realme/sm8250 --depth=1
+git clone https://github.com/EvoX-Spartan/android_kernel_realme_sm8250 -b bka kernel/realme/sm8250 --depth=1
 
 # Hardware Trees
 git clone https://github.com/EvoX-Spartan/hardware_dolby hardware/dolby --depth=1
