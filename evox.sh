@@ -10,7 +10,7 @@ repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs
 /opt/crave/resync.sh || repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
 pushd packages/apps/Updater
-git fetch https://github.com/AloozChips/evo_updater.git && git cherry-pick 681f0f9c612149e7b3d8d188dde145ce1b8a64a3
+git fetch https://github.com/EvoX-Spartan/packages_apps_Updater && git cherry-pick 07ea7003ea4465d9bdf0fe65b94e860693597989
 popd
 
 rm -rf device/realme
