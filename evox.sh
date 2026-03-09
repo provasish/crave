@@ -4,7 +4,7 @@ rm -rf .repo/local_manifests
 
 repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs
 
-/opt/crave/resync.sh || repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+/opt/crave/resync.sh
 
 rm -rf device/realme
 rm -rf vendor/realme
