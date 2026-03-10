@@ -1,19 +1,21 @@
-#!/bin/bash
-
-rm -rf .repo/local_manifests
-
+# repo init
 repo init -u https://github.com/The-Clover-Project/manifest.git -b 16-qpr2 --git-lfs --depth=1
 
+# repo sync script
 /opt/crave/resync.sh
 
-rm -rf device/realme
-rm -rf vendor/realme
-rm -rf kernel/realme
-rm -rf hardware/dolby
-rm -rf hardware/oplus
-rm -rf vendor/oplus
-rm -rf out/target/product/spartan
-rm -rf vendor/clover-priv/keys
+# Remove old device specific repos
+remove=(
+device/realme
+kernel/realme
+vendor/realme
+hardware/oplus
+hardware/dolby
+vendor/clover-priv/keys
+out/target/product/spartan
+)
+
+rm -rf "${remove[@]}"
 
 # Deivce Trees
 git clone https://github.com/clover-spartan/android_device_realme_spartan device/realme/spartan
@@ -33,15 +35,13 @@ git clone https://github.com/clover-Spartan/android_hardware_oplus hardware/oplu
 # Oplus Camera
 git clone https://github.com/clover-spartan/vendor_oplus_camera vendor/oplus/camera --depth=1
 
-# Sign Keys
-git clone https://github.com/olzhas0986/keys -b cl vendor/clover-priv/keys
+# My Keys
+git clone https://github.com/Olzhas-Kdyr/keys -b cl vendor/clover-priv/keys
 
-export TZ=Asia/Kolkata
-export BUILD_USERNAME=hunt3r
-export BUILD_HOSTNAME=crave
-export TARGET_BUILD_VARIANT=user
 
+# Building 
 . build/envsetup.sh
+export BUILD_USERNAME=hunt3r
+export BUILD_HOSTNAME=pro
 lunch clover_spartan-bp4a-user
-m installclean
 mka clover -j$(nproc --all)
