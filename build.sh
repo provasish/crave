@@ -19,18 +19,18 @@ rm -rf "${remove[@]}"
 
 # Deivce Trees
 git clone https://github.com/clover-spartan/android_device_realme_spartan device/realme/spartan
-git clone https://github.com/clover-Spartan/android_device_realme_sm8250-common device/realme/sm8250-common
+git clone https://github.com/clover-spartan/android_device_realme_sm8250-common device/realme/sm8250-common
 
 # Vendor Trees
-git clone https://github.com/clover-Spartan/proprietary_vendor_realme_spartan vendor/realme/spartan
-git clone https://github.com/clover-Spartan/proprietary_vendor_realme_sm8250-common vendor/realme/sm8250-common --depth=1
+git clone https://github.com/clover-spartan/proprietary_vendor_realme_spartan vendor/realme/spartan
+git clone hhttps://github.com/clover-spartan/proprietary_vendor_realme_sm8250-common vendor/realme/sm8250-common --depth=1
 
 # Kernel Tree
 git clone https://github.com/clover-spartan/android_kernel_realme_sm8250 kernel/realme/sm8250 --depth=1
 
 # Hardware Trees
-git clone https://github.com/clover-Spartan/hardware_dolby hardware/dolby --depth=1
-git clone https://github.com/clover-Spartan/android_hardware_oplus hardware/oplus
+git clone https://github.com/clover-spartan/android_hardware_dolby hardware/dolby
+git clone https://github.com/clover-spartan/android_hardware_oplus hardware/oplus
 
 # Oplus Camera
 git clone https://github.com/clover-spartan/vendor_oplus_camera vendor/oplus/camera --depth=1
