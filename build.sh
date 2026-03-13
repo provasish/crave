@@ -23,7 +23,7 @@ git clone https://github.com/clover-spartan/android_device_realme_sm8250-common 
 
 # Vendor Trees
 git clone https://github.com/clover-spartan/proprietary_vendor_realme_spartan vendor/realme/spartan
-git clone hhttps://github.com/clover-spartan/proprietary_vendor_realme_sm8250-common vendor/realme/sm8250-common --depth=1
+git clone https://github.com/clover-spartan/proprietary_vendor_realme_sm8250-common vendor/realme/sm8250-common --depth=1
 
 # Kernel Tree
 git clone https://github.com/clover-spartan/android_kernel_realme_sm8250 kernel/realme/sm8250 --depth=1
