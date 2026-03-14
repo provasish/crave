@@ -9,6 +9,7 @@ remove=(
 device/realme
 kernel/realme
 vendor/realme
+vendor/oplus
 hardware/oplus
 hardware/dolby
 vendor/clover-priv/keys
@@ -33,7 +34,7 @@ git clone https://github.com/clover-spartan/android_hardware_dolby hardware/dolb
 git clone https://github.com/clover-spartan/android_hardware_oplus hardware/oplus
 
 # Oplus Camera
-git clone https://github.com/clover-spartan/vendor_oplus_camera vendor/oplus/camera --depth=1
+git clone https://gitlab.com/bijoyv9/proprietary_vendor_oplus_camera vendor/oplus/camera --depth=1
 
 # My Keys
 git clone https://github.com/Olzhas-Kdyr/keys -b cl vendor/clover-priv/keys
