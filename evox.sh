@@ -109,9 +109,6 @@ start_build_process() {
     # Resync sources
     /opt/crave/resync.sh
     repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
-    /opt/crave/resync.sh
-    repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
-    /opt/crave/resync.sh
 
     # Clean up existing trees
     echo "Starting remove repositories..."
