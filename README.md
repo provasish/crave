@@ -1,6 +1,6 @@
 # Evox :
 ```
-crave run --no-patch -- "https://raw.githubusercontent.com/provasish/crave/refs/heads/evox/evox.sh | bash"
+crave run --no-patch -- "curl -s https://raw.githubusercontent.com/provasish/crave/evox/evox.sh | bash"
 ```
 
 # Test :
