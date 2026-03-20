@@ -5,7 +5,7 @@
 # =========================================================
 # This token was retrieved from your previous log for continuous functionality.
 TG_BOT_TOKEN="8614247175:AAHQzSIbrgB1pNXQ-J2vyUsQUbpOWvQ_6Qc"
-TG_BUILD_CHAT_ID="-5209690400"
+TG_BUILD_CHAT_ID="-1003529010804"
 DEVICE_CODE="spartan"
 BUILD_TARGET="Evolution-X"
 ANDROID_VERSION="16.2"
