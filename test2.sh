@@ -17,7 +17,6 @@ export BUILD_HOSTNAME=pro
 # TELEGRAM FUNCTIONS
 # =========================================================
 
-# Normal message
 send_telegram() {
   local message="$1"
 
@@ -28,7 +27,6 @@ send_telegram() {
     -d "disable_web_page_preview=true" > /dev/null
 }
 
-# Message with button
 send_telegram_button() {
   local text="$1"
   local url="$2"
@@ -39,6 +37,26 @@ send_telegram_button() {
     -d "parse_mode=HTML" \
     -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"⬇️ Download ROM\",\"url\":\"$url\"}]]}" \
     -d "disable_web_page_preview=true" > /dev/null
+}
+
+# Progress message (edit same message)
+send_or_edit_progress() {
+  local percent="$1"
+
+  if [[ -z "$PROGRESS_MSG_ID" ]]; then
+    RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+      -d "chat_id=${TG_BUILD_CHAT_ID}" \
+      -d "text=📊 <b>Build Progress:</b> ${percent}%" \
+      -d "parse_mode=HTML")
+
+    PROGRESS_MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+')
+  else
+    curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/editMessageText" \
+      -d "chat_id=${TG_BUILD_CHAT_ID}" \
+      -d "message_id=${PROGRESS_MSG_ID}" \
+      -d "text=📊 <b>Build Progress:</b> ${percent}%" \
+      -d "parse_mode=HTML" > /dev/null
+  fi
 }
 
 # =========================================================
@@ -59,7 +77,6 @@ start_build_process() {
 
     START_TIME=$(date +%s)
 
-    # 🔔 START MESSAGE
     send_telegram "⚙️ <b>ROM Build Started!</b>
 <b>ROM:</b> $BUILD_TARGET
 <b>Android:</b> $ANDROID_VERSION
@@ -71,7 +88,6 @@ start_build_process() {
     # =========================================================
 
     repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs --depth=1
-    /opt/crave/resync.sh
     repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
     rm -rf device/realme vendor/realme kernel/realme hardware/oplus hardware/dolby
@@ -96,7 +112,34 @@ start_build_process() {
     . build/envsetup.sh
     lunch lineage_spartan-bp4a-user
 
-    m evolution -j$(nproc --all)
+    # =========================================================
+    # BUILD WITH PROGRESS %
+    # =========================================================
+
+    BUILD_LOG=build.log
+    : > $BUILD_LOG
+
+    (
+      m evolution -j$(nproc --all) 2>&1 | tee $BUILD_LOG
+    ) &
+
+    BUILD_PID=$!
+    LAST_PERCENT=0
+
+    while kill -0 $BUILD_PID 2>/dev/null; do
+      PERCENT=$(grep -oP '\[\s*\K[0-9]+(?=%)' $BUILD_LOG | tail -n 1)
+
+      if [[ ! -z "$PERCENT" ]]; then
+        if (( PERCENT >= LAST_PERCENT + 3 )); then
+          send_or_edit_progress "$PERCENT"
+          LAST_PERCENT=$PERCENT
+        fi
+      fi
+
+      sleep 15
+    done
+
+    wait $BUILD_PID
     BUILD_STATUS=$?
 
     # =========================================================
@@ -123,7 +166,7 @@ start_build_process() {
 <b>Status:</b> $status_text"
 
     # =========================================================
-    # UPLOAD SECTION
+    # UPLOAD
     # =========================================================
 
     if [[ $BUILD_STATUS -eq 0 ]]; then
@@ -131,8 +174,6 @@ start_build_process() {
         rm -rf go-up*
         wget -q https://raw.githubusercontent.com/chime-A13/tools-gofile/refs/heads/private/go-up
         chmod +x go-up
-
-        echo "Uploading build..."
 
         ZIP_FILE=$(ls out/target/product/spartan/Evolution*spartan*.zip 2>/dev/null | head -n 1)
 
@@ -142,8 +183,6 @@ start_build_process() {
         fi
 
         UPLOAD_OUTPUT=$(./go-up "$ZIP_FILE" 2>&1)
-
-        echo "$UPLOAD_OUTPUT"
 
         UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep -Eo 'https?://[^ ]+' | head -n 1)
 
