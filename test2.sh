@@ -58,7 +58,7 @@ send_telegram() {
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     -d "chat_id=${chat_id}" \
     -d "text=${encoded_message}" \
-    -d "parse_mode=MarkdownV2" \
+    -d "parse_mode=HTML" \
     -d "disable_web_page_preview=true" > /dev/null
 }
 
@@ -151,13 +151,13 @@ start_build_process() {
         UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep -Eo 'https?://[^ ]+' | head -n 1)
 
         if [[ -n "$UPLOAD_LINK" ]]; then
-            upload_msg="📦 *Build Uploaded!*
-            *ROM:* $BUILD_TARGET
-            *Android:* $ANDROID_VERSION
-            *Device:* $DEVICE_CODE
-            *Link:* $UPLOAD_LINK"
+            upload_msg="📦 <b>Build Uploaded!</b>
+            <b>ROM:</b> $BUILD_TARGET
+            <b>Android:</b> $ANDROID_VERSION
+            <b>Device:</b> $DEVICE_CODE
+            <b>Link:</b> <a href='$UPLOAD_LINK'>Download</a>"
         else
-            upload_msg="⚠️ *Upload done but link not found!*
+            upload_msg="⚠️ <b>Upload done but link not found!</b>
             Check logs manually."
         fi
 
