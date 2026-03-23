@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# =========================================================
-# CONFIGURATION
-# =========================================================
+# CONFIG
 TG_BOT_TOKEN="8614247175:AAHQzSIbrgB1pNXQ-J2vyUsQUbpOWvQ_6Qc"
 TG_BUILD_CHAT_ID="-1003529010804"
 DEVICE_CODE="spartan"
@@ -10,21 +8,14 @@ BUILD_TARGET="Evolution-X"
 ANDROID_VERSION="16.2"
 
 export TZ="Asia/Kolkata"
-export BUILD_USERNAME=hunt3r
-export BUILD_HOSTNAME=pro
 
-# =========================================================
-# TELEGRAM FUNCTIONS
-# =========================================================
-
+# TELEGRAM BASIC
 send_telegram() {
   local message="$1"
-
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     -d "chat_id=${TG_BUILD_CHAT_ID}" \
     -d "text=${message}" \
-    -d "parse_mode=HTML" \
-    -d "disable_web_page_preview=true" > /dev/null
+    -d "parse_mode=HTML" > /dev/null
 }
 
 send_telegram_button() {
@@ -35,18 +26,52 @@ send_telegram_button() {
     -d "chat_id=${TG_BUILD_CHAT_ID}" \
     -d "text=${text}" \
     -d "parse_mode=HTML" \
-    -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"⬇️ Download ROM\",\"url\":\"$url\"}]]}" \
-    -d "disable_web_page_preview=true" > /dev/null
+    -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"⬇️ Download ROM\",\"url\":\"$url\"}]]}" > /dev/null
 }
 
-# Progress message (edit same message)
+# PROGRESS BAR
+generate_bar() {
+  local percent=$1
+  local total=20
+  local filled=$((percent * total / 100))
+  local empty=$((total - filled))
+
+  printf "["
+  for ((i=0;i<filled;i++)); do printf "█"; done
+  for ((i=0;i<empty;i++)); do printf "░"; done
+  printf "]"
+}
+
+# ETA CALC
+estimate_eta() {
+  local percent=$1
+  local elapsed=$2
+
+  if (( percent > 0 )); then
+    total=$((elapsed * 100 / percent))
+    remaining=$((total - elapsed))
+    printf "%02dh %02dm" $((remaining/3600)) $(( (remaining%3600)/60 ))
+  else
+    echo "--"
+  fi
+}
+
+# PROGRESS MESSAGE
 send_or_edit_progress() {
   local percent="$1"
+  local elapsed="$2"
+
+  BAR=$(generate_bar "$percent")
+  ETA=$(estimate_eta "$percent" "$elapsed")
+
+  TEXT="📊 <b>Build Progress:</b> ${percent}%
+${BAR}
+⏱️ ETA: ~${ETA}"
 
   if [[ -z "$PROGRESS_MSG_ID" ]]; then
     RESPONSE=$(curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
       -d "chat_id=${TG_BUILD_CHAT_ID}" \
-      -d "text=📊 <b>Build Progress:</b> ${percent}%" \
+      -d "text=${TEXT}" \
       -d "parse_mode=HTML")
 
     PROGRESS_MSG_ID=$(echo "$RESPONSE" | grep -oP '"message_id":\K[0-9]+')
@@ -54,152 +79,73 @@ send_or_edit_progress() {
     curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/editMessageText" \
       -d "chat_id=${TG_BUILD_CHAT_ID}" \
       -d "message_id=${PROGRESS_MSG_ID}" \
-      -d "text=📊 <b>Build Progress:</b> ${percent}%" \
+      -d "text=${TEXT}" \
       -d "parse_mode=HTML" > /dev/null
   fi
 }
 
-# =========================================================
-# TIME FORMAT
-# =========================================================
-format_duration() {
-    local T=$1
-    local H=$((T/3600))
-    local M=$(( (T%3600)/60 ))
-    local S=$((T%60))
-    printf "%02d hours, %02d minutes, %02d seconds" $H $M $S
-}
+# MAIN
+START_TIME=$(date +%s)
 
-# =========================================================
-# BUILD FUNCTION
-# =========================================================
-start_build_process() {
-
-    START_TIME=$(date +%s)
-
-    send_telegram "⚙️ <b>ROM Build Started!</b>
+send_telegram "⚙️ <b>Build Started</b>
 <b>ROM:</b> $BUILD_TARGET
-<b>Android:</b> $ANDROID_VERSION
-<b>Device:</b> $DEVICE_CODE
-<b>Start Time:</b> $(date '+%Y-%m-%d %H:%M:%S %Z')"
+<b>Device:</b> $DEVICE_CODE"
 
-    # =========================================================
-    # BUILD STEPS
-    # =========================================================
+repo init -u https://github.com/Evolution-X/manifest -b bq2 --depth=1
+repo sync -c -j$(nproc --all)
 
-    repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs --depth=1
-    repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+. build/envsetup.sh
+lunch lineage_spartan-bp4a-user
 
-    rm -rf device/realme vendor/realme kernel/realme hardware/oplus hardware/dolby
-    rm -rf out/target/product/spartan
-    rm -rf vendor/*priv* vendor/evolution/*priv* vendor/*lineage-priv*
+# BUILD
+BUILD_LOG=build.log
+: > $BUILD_LOG
 
-    git clone https://github.com/EvoX-Spartan/android_device_realme_spartan device/realme/spartan
-    git clone https://github.com/EvoX-Spartan/android_device_realme_sm8250-common device/realme/sm8250-common
-    git clone https://github.com/EvoX-Spartan/proprietary_vendor_realme_spartan vendor/realme/spartan
-    git clone https://github.com/EvoX-Spartan/proprietary_vendor_realme_sm8250-common vendor/realme/sm8250-common --depth=1
-    git clone https://github.com/EvoX-Spartan/android_kernel_realme_sm8250 -b bka kernel/realme/sm8250 --depth=1
-    git clone https://github.com/EvoX-Spartan/hardware_dolby hardware/dolby --depth=1
-    git clone https://github.com/EvoX-Spartan/android_hardware_oplus hardware/oplus
-    git clone https://gitlab.com/provasishh/proprietary_vendor_oplus_camera.git vendor/oplus/camera --depth=1
+(
+  m evolution -j$(nproc --all) 2>&1 | tee $BUILD_LOG
+) &
 
-    git clone https://github.com/Evolution-X/vendor_evolution-priv_keys-template vendor/evolution-priv/keys --depth 1
-    chmod +x vendor/evolution-priv/keys/keys.sh
-    pushd vendor/evolution-priv/keys
-    ./keys.sh
-    popd
+PID=$!
+LAST=0
 
-    . build/envsetup.sh
-    lunch lineage_spartan-bp4a-user
+while kill -0 $PID 2>/dev/null; do
+  PERCENT=$(grep -oP '\[\s*\K[0-9]+(?=%)' $BUILD_LOG | tail -n 1)
 
-    # =========================================================
-    # BUILD WITH PROGRESS %
-    # =========================================================
+  NOW=$(date +%s)
+  ELAPSED=$((NOW - START_TIME))
 
-    BUILD_LOG=build.log
-    : > $BUILD_LOG
-
-    (
-      m evolution -j$(nproc --all) 2>&1 | tee $BUILD_LOG
-    ) &
-
-    BUILD_PID=$!
-    LAST_PERCENT=0
-
-    while kill -0 $BUILD_PID 2>/dev/null; do
-      PERCENT=$(grep -oP '\[\s*\K[0-9]+(?=%)' $BUILD_LOG | tail -n 1)
-
-      if [[ ! -z "$PERCENT" ]]; then
-        if (( PERCENT >= LAST_PERCENT + 3 )); then
-          send_or_edit_progress "$PERCENT"
-          LAST_PERCENT=$PERCENT
-        fi
-      fi
-
-      sleep 15
-    done
-
-    wait $BUILD_PID
-    BUILD_STATUS=$?
-
-    # =========================================================
-    # BUILD RESULT
-    # =========================================================
-
-    END_TIME=$(date +%s)
-    DURATION=$((END_TIME - START_TIME))
-    DURATION_FORMATTED=$(format_duration $DURATION)
-
-    if [[ $BUILD_STATUS -eq 0 ]]; then
-        status_icon="✅"
-        status_text="Success"
-    else
-        status_icon="❌"
-        status_text="Failed"
+  if [[ ! -z "$PERCENT" ]]; then
+    if (( PERCENT >= LAST + 3 )); then
+      send_or_edit_progress "$PERCENT" "$ELAPSED"
+      LAST=$PERCENT
     fi
+  fi
 
-    send_telegram "${status_icon} <b>Build Finished!</b>
-<b>ROM:</b> $BUILD_TARGET
-<b>Android:</b> $ANDROID_VERSION
-<b>Device:</b> $DEVICE_CODE
-<b>Duration:</b> $DURATION_FORMATTED
-<b>Status:</b> $status_text"
+  sleep 15
+done
 
-    # =========================================================
-    # UPLOAD
-    # =========================================================
+wait $PID
+STATUS=$?
 
-    if [[ $BUILD_STATUS -eq 0 ]]; then
+END=$(date +%s)
+DUR=$((END - START_TIME))
 
-        rm -rf go-up*
-        wget -q https://raw.githubusercontent.com/chime-A13/tools-gofile/refs/heads/private/go-up
-        chmod +x go-up
+if [[ $STATUS -eq 0 ]]; then
+  send_telegram "✅ <b>Build Finished</b>
+Duration: $((DUR/60)) min"
+else
+  send_telegram "❌ <b>Build Failed</b>"
+fi
 
-        ZIP_FILE=$(ls out/target/product/spartan/Evolution*spartan*.zip 2>/dev/null | head -n 1)
+# UPLOAD
+if [[ $STATUS -eq 0 ]]; then
+  wget -q https://raw.githubusercontent.com/chime-A13/tools-gofile/refs/heads/private/go-up
+  chmod +x go-up
 
-        if [[ -z "$ZIP_FILE" ]]; then
-            send_telegram "❌ <b>No ZIP found to upload!</b>"
-            exit 1
-        fi
+  ZIP=$(ls out/target/product/spartan/*.zip | head -n1)
 
-        UPLOAD_OUTPUT=$(./go-up "$ZIP_FILE" 2>&1)
+  OUT=$(./go-up "$ZIP")
+  LINK=$(echo "$OUT" | grep -Eo 'https?://[^ ]+' | head -n1)
 
-        UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep -Eo 'https?://[^ ]+' | head -n 1)
-
-        if [[ -n "$UPLOAD_LINK" ]]; then
-            send_telegram_button "📦 <b>Build Uploaded!</b>
-<b>ROM:</b> $BUILD_TARGET
-<b>Device:</b> $DEVICE_CODE" "$UPLOAD_LINK"
-        else
-            send_telegram "❌ <b>Upload failed!</b>
-<pre>$UPLOAD_OUTPUT</pre>"
-        fi
-    fi
-
-    cat out/error.log
-}
-
-# =========================================================
-# RUN
-# =========================================================
-start_build_process
+  send_telegram_button "📦 <b>Build Uploaded</b>" "$LINK"
+fi
