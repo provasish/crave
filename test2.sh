@@ -9,59 +9,26 @@ DEVICE_CODE="spartan"
 BUILD_TARGET="Evolution-X"
 ANDROID_VERSION="16.2"
 
-# SHELL CONFIGURATION
 export TZ="Asia/Kolkata"
 export BUILD_USERNAME=hunt3r
 export BUILD_HOSTNAME=pro
 
 # =========================================================
-# TELEGRAM FUNCTIONS
+# TELEGRAM FUNCTION (CLEAN)
 # =========================================================
-
 send_telegram() {
-  local chat_id="$1"
-  local message="$2"
+  local message="$1"
 
-  local escaped_message=$(echo "$message" | sed \
-    -e 's/\*/\*TEMP\*/g' \
-    -e 's/_/\_TEMP\_/g' \
-    -e 's/\[/\\[/g' \
-    -e 's/\]/\\]/g' \
-    -e 's/(/\\(/g' \
-    -e 's/)/\\)/g' \
-    -e 's/~/\\~/g' \
-    -e 's/`/\`/g' \
-    -e 's/>/\\>/g' \
-    -e 's/#/\\#/g' \
-    -e 's/+/\\+/g' \
-    -e 's/-/\\-/g' \
-    -e 's/=/\\=/g' \
-    -e 's/|/\\|/g' \
-    -e 's/{/\\{/g' \
-    -e 's/}/\\}/g' \
-    -e 's/\./\\./g' \
-    -e 's/!/\\!/g')
-
-  local re_escaped_message=$(echo "$escaped_message" | sed \
-    -e 's/\*TEMP\*/\*/g' \
-    -e 's/\_TEMP\_/\_/g')
-  
-  local encoded_message=$(echo "$re_escaped_message" | sed \
-    -e 's/%/%25/g' \
-    -e 's/&/%26/g' \
-    -e 's/+/%2b/g' \
-    -e 's/ /%20/g' \
-    -e 's/\"/%22/g' \
-    -e 's/'"'"'/%27/g' \
-    -e 's/\n/%0A/g')
-    
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
-    -d "chat_id=${chat_id}" \
-    -d "text=${encoded_message}" \
+    -d "chat_id=${TG_BUILD_CHAT_ID}" \
+    -d "text=${message}" \
     -d "parse_mode=HTML" \
     -d "disable_web_page_preview=true" > /dev/null
 }
 
+# =========================================================
+# TIME FORMAT
+# =========================================================
 format_duration() {
     local T=$1
     local H=$((T/3600))
@@ -71,19 +38,22 @@ format_duration() {
 }
 
 # =========================================================
-# BUILD LOGIC FUNCTION
+# BUILD FUNCTION
 # =========================================================
-
 start_build_process() {
 
     START_TIME=$(date +%s)
 
-    local initial_msg="⚙️ *ROM Build Started!*
-    *ROM:* $BUILD_TARGET
-    *Android:* $ANDROID_VERSION
-    *Device:* $DEVICE_CODE
-    *Start Time:* $(date '+%Y-%m-%d %H:%M:%S %Z')"
-    send_telegram "$TG_BUILD_CHAT_ID" "$initial_msg"
+    # 🔔 START MESSAGE
+    send_telegram "⚙️ <b>ROM Build Started!</b>
+<b>ROM:</b> $BUILD_TARGET
+<b>Android:</b> $ANDROID_VERSION
+<b>Device:</b> $DEVICE_CODE
+<b>Start Time:</b> $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+    # =========================================================
+    # BUILD STEPS
+    # =========================================================
 
     repo init -u https://github.com/Evolution-X/manifest -b bq2 --git-lfs --depth=1
     /opt/crave/resync.sh
@@ -114,6 +84,10 @@ start_build_process() {
     m evolution -j$(nproc --all)
     BUILD_STATUS=$?
 
+    # =========================================================
+    # BUILD RESULT
+    # =========================================================
+
     END_TIME=$(date +%s)
     DURATION=$((END_TIME - START_TIME))
     DURATION_FORMATTED=$(format_duration $DURATION)
@@ -123,52 +97,56 @@ start_build_process() {
         status_text="Success"
     else
         status_icon="❌"
-        status_text="Failure (Exit Code: $BUILD_STATUS)"
+        status_text="Failed"
     fi
 
-    final_msg="${status_icon} *Build Finished!*
-    *ROM:* $BUILD_TARGET
-    *Android:* $ANDROID_VERSION
-    *Device:* $DEVICE_CODE
-    *Duration:* $DURATION_FORMATTED
-    *Status:* $status_text"
-    send_telegram "$TG_BUILD_CHAT_ID" "$final_msg"
+    send_telegram "${status_icon} <b>Build Finished!</b>
+<b>ROM:</b> $BUILD_TARGET
+<b>Android:</b> $ANDROID_VERSION
+<b>Device:</b> $DEVICE_CODE
+<b>Duration:</b> $DURATION_FORMATTED
+<b>Status:</b> $status_text"
 
     # =========================================================
-    # ✅ UPDATED UPLOAD + TELEGRAM LINK PART
+    # UPLOAD SECTION
     # =========================================================
+
     if [[ $BUILD_STATUS -eq 0 ]]; then
+
         rm -rf go-up*
-        wget https://raw.githubusercontent.com/chime-A13/tools-gofile/refs/heads/private/go-up
+        wget -q https://raw.githubusercontent.com/chime-A13/tools-gofile/refs/heads/private/go-up
         chmod +x go-up
 
         echo "Uploading build..."
 
-        UPLOAD_OUTPUT=$(./go-up out/target/product/spartan/Evolution*spartan*.zip)
+        ZIP_FILE=$(ls out/target/product/spartan/Evolution*spartan*.zip 2>/dev/null | head -n 1)
+
+        if [[ -z "$ZIP_FILE" ]]; then
+            send_telegram "❌ <b>No ZIP found to upload!</b>"
+            exit 1
+        fi
+
+        UPLOAD_OUTPUT=$(./go-up "$ZIP_FILE" 2>&1)
 
         echo "$UPLOAD_OUTPUT"
 
         UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep -Eo 'https?://[^ ]+' | head -n 1)
 
         if [[ -n "$UPLOAD_LINK" ]]; then
-            upload_msg="📦 <b>Build Uploaded!</b>
-            <b>ROM:</b> $BUILD_TARGET
-            <b>Android:</b> $ANDROID_VERSION
-            <b>Device:</b> $DEVICE_CODE
-            <b>Link:</b> <a href='$UPLOAD_LINK'>Download</a>"
+            send_telegram "📦 <b>Build Uploaded!</b>
+<b>ROM:</b> $BUILD_TARGET
+<b>Device:</b> $DEVICE_CODE
+<b>Link:</b> <a href='$UPLOAD_LINK'>Download</a>"
         else
-            upload_msg="⚠️ <b>Upload done but link not found!</b>
-            Check logs manually."
+            send_telegram "❌ <b>Upload failed!</b>
+<pre>$UPLOAD_OUTPUT</pre>"
         fi
-
-        send_telegram "$TG_BUILD_CHAT_ID" "$upload_msg"
     fi
 
     cat out/error.log
 }
 
 # =========================================================
-# MAIN EXECUTION
+# RUN
 # =========================================================
-
 start_build_process
