@@ -1,6 +1,8 @@
 #!/bin/bash
 
+# =========================================================
 # CONFIG
+# =========================================================
 TG_BOT_TOKEN="8614247175:AAHQzSIbrgB1pNXQ-J2vyUsQUbpOWvQ_6Qc"
 TG_BUILD_CHAT_ID="-1001989043437"
 DEVICE_CODE="spartan"
@@ -9,13 +11,16 @@ ANDROID_VERSION="16.2"
 
 export TZ="Asia/Kolkata"
 
-# TELEGRAM BASIC
+# =========================================================
+# TELEGRAM
+# =========================================================
 send_telegram() {
   local message="$1"
   curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
     -d "chat_id=${TG_BUILD_CHAT_ID}" \
     -d "text=${message}" \
-    -d "parse_mode=HTML" > /dev/null
+    -d "parse_mode=HTML" \
+    -d "disable_web_page_preview=true" > /dev/null
 }
 
 send_telegram_button() {
@@ -26,10 +31,13 @@ send_telegram_button() {
     -d "chat_id=${TG_BUILD_CHAT_ID}" \
     -d "text=${text}" \
     -d "parse_mode=HTML" \
-    -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"⬇️ Download ROM\",\"url\":\"$url\"}]]}" > /dev/null
+    -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"⬇️ Download ROM\",\"url\":\"$url\"}]]}" \
+    -d "disable_web_page_preview=true" > /dev/null
 }
 
-# PROGRESS BAR
+# =========================================================
+# PROGRESS BAR + ETA
+# =========================================================
 generate_bar() {
   local percent=$1
   local total=20
@@ -37,15 +45,19 @@ generate_bar() {
   local empty=$((total - filled))
 
   printf "["
-  for ((i=0;i<filled;i++)); do printf "█"; done
-  for ((i=0;i<empty;i++)); do printf "░"; done
+  for ((i=0;i<filled;i++)); do printf "#"; done
+  for ((i=0;i<empty;i++)); do printf "-"; done
   printf "]"
 }
 
-# ETA CALC
 estimate_eta() {
   local percent=$1
   local elapsed=$2
+
+  if (( percent >= 99 )); then
+    echo "Done"
+    return
+  fi
 
   if (( percent > 0 )); then
     total=$((elapsed * 100 / percent))
@@ -56,7 +68,9 @@ estimate_eta() {
   fi
 }
 
-# PROGRESS MESSAGE
+# =========================================================
+# EDITABLE PROGRESS MESSAGE
+# =========================================================
 send_or_edit_progress() {
   local percent="$1"
   local elapsed="$2"
@@ -84,68 +98,120 @@ ${BAR}
   fi
 }
 
-# MAIN
-START_TIME=$(date +%s)
+# =========================================================
+# TIME FORMAT
+# =========================================================
+format_duration() {
+  local T=$1
+  printf "%02d min %02d sec" $((T/60)) $((T%60))
+}
 
-send_telegram "⚙️ <b>Build Started</b>
+# =========================================================
+# MAIN
+# =========================================================
+start_build_process() {
+
+  START_TIME=$(date +%s)
+
+  send_telegram "⚙️ <b>ROM Build Started</b>
 <b>ROM:</b> $BUILD_TARGET
+<b>Android:</b> $ANDROID_VERSION
 <b>Device:</b> $DEVICE_CODE"
 
-repo init -u https://github.com/Evolution-X/manifest -b bq2 --depth=1
-repo sync -c -j$(nproc --all)
+  # =========================================================
+  # SYNC
+  # =========================================================
+  repo init -u https://github.com/Evolution-X/manifest -b bq2 --depth=1
+  repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
 
-. build/envsetup.sh
-lunch lineage_spartan-bp4a-user
+  # =========================================================
+  # SETUP
+  # =========================================================
+  . build/envsetup.sh
+  lunch lineage_spartan-bp4a-user
 
-# BUILD
-BUILD_LOG=build.log
-: > $BUILD_LOG
+  # =========================================================
+  # BUILD WITH PROGRESS
+  # =========================================================
+  BUILD_LOG=build.log
+  : > $BUILD_LOG
 
-(
-  m evolution -j$(nproc --all) 2>&1 | tee $BUILD_LOG
-) &
+  (
+    m evolution -j$(nproc --all) 2>&1 | tee $BUILD_LOG
+  ) &
 
-PID=$!
-LAST=0
+  BUILD_PID=$!
+  LAST_PERCENT=0
 
-while kill -0 $PID 2>/dev/null; do
-  PERCENT=$(grep -oP '\[\s*\K[0-9]+(?=%)' $BUILD_LOG | tail -n 1)
+  while kill -0 $BUILD_PID 2>/dev/null; do
+    PERCENT=$(grep -oP '\[\s*\K[0-9]+(?=%)' $BUILD_LOG | tail -n 1)
 
-  NOW=$(date +%s)
-  ELAPSED=$((NOW - START_TIME))
+    NOW=$(date +%s)
+    ELAPSED=$((NOW - START_TIME))
 
-  if [[ ! -z "$PERCENT" ]]; then
-    if (( PERCENT >= LAST + 3 )); then
-      send_or_edit_progress "$PERCENT" "$ELAPSED"
-      LAST=$PERCENT
+    if [[ ! -z "$PERCENT" ]]; then
+      if (( PERCENT >= LAST_PERCENT + 3 )); then
+        send_or_edit_progress "$PERCENT" "$ELAPSED"
+        LAST_PERCENT=$PERCENT
+      fi
     fi
+
+    sleep 15
+  done
+
+  wait $BUILD_PID
+  BUILD_STATUS=$?
+
+  END_TIME=$(date +%s)
+  DURATION=$((END_TIME - START_TIME))
+
+  # =========================================================
+  # RESULT
+  # =========================================================
+  if [[ $BUILD_STATUS -eq 0 ]]; then
+    send_telegram "✅ <b>Build Finished</b>
+<b>Duration:</b> $(format_duration $DURATION)"
+  else
+    send_telegram "❌ <b>Build Failed</b>"
+    exit 1
   fi
 
-  sleep 15
-done
-
-wait $PID
-STATUS=$?
-
-END=$(date +%s)
-DUR=$((END - START_TIME))
-
-if [[ $STATUS -eq 0 ]]; then
-  send_telegram "✅ <b>Build Finished</b>
-Duration: $((DUR/60)) min"
-else
-  send_telegram "❌ <b>Build Failed</b>"
-fi
-
-# UPLOAD
-if [[ $STATUS -eq 0 ]]; then
+  # =========================================================
+  # UPLOAD
+  # =========================================================
   wget -q https://raw.githubusercontent.com/chime-A13/tools-gofile/refs/heads/private/go-up
   chmod +x go-up
 
-  ZIP=$(ls out/target/product/spartan/*.zip | head -n1)
+  ZIP_FILE=$(ls out/target/product/spartan/Evolution*spartan*.zip 2>/dev/null | head -n 1)
 
-  OUT=$(./go-up "$ZIP")
-  LINK=$(echo "$OUT" | grep -Eo 'https?://[^ ]+' | head -n1)
+  if [[ -z "$ZIP_FILE" ]]; then
+    send_telegram "❌ <b>No ZIP found to upload</b>"
+    exit 1
+  fi
 
-  send_telegram_button "📦 <b>Build Uploaded</b>" "$LINK"
-fi
+  UPLOAD_OUTPUT=$(./go-up "$ZIP_FILE" 2>&1)
+
+  echo "$UPLOAD_OUTPUT"
+
+  # 🔥 FIXED LINK EXTRACTION
+  UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep -oP '(?<=Link: ).*')
+
+  # fallback if format different
+  if [[ -z "$UPLOAD_LINK" ]]; then
+    UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep 'gofile.io' | tail -n 1)
+  fi
+
+  if [[ -n "$UPLOAD_LINK" ]]; then
+    send_telegram_button "📦 <b>Build Uploaded</b>
+<b>ROM:</b> $BUILD_TARGET
+<b>Device:</b> $DEVICE_CODE" "$UPLOAD_LINK"
+  else
+    send_telegram "❌ <b>Upload failed</b>
+<pre>$UPLOAD_OUTPUT</pre>"
+  fi
+}
+
+# =========================================================
+# RUN
+# =========================================================
+start_build_process
