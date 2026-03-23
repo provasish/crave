@@ -14,8 +14,10 @@ export BUILD_USERNAME=hunt3r
 export BUILD_HOSTNAME=pro
 
 # =========================================================
-# TELEGRAM FUNCTION (CLEAN)
+# TELEGRAM FUNCTIONS
 # =========================================================
+
+# Normal message
 send_telegram() {
   local message="$1"
 
@@ -23,6 +25,19 @@ send_telegram() {
     -d "chat_id=${TG_BUILD_CHAT_ID}" \
     -d "text=${message}" \
     -d "parse_mode=HTML" \
+    -d "disable_web_page_preview=true" > /dev/null
+}
+
+# Message with button
+send_telegram_button() {
+  local text="$1"
+  local url="$2"
+
+  curl -s -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${TG_BUILD_CHAT_ID}" \
+    -d "text=${text}" \
+    -d "parse_mode=HTML" \
+    -d "reply_markup={\"inline_keyboard\":[[{\"text\":\"⬇️ Download ROM\",\"url\":\"$url\"}]]}" \
     -d "disable_web_page_preview=true" > /dev/null
 }
 
@@ -133,10 +148,9 @@ start_build_process() {
         UPLOAD_LINK=$(echo "$UPLOAD_OUTPUT" | grep -Eo 'https?://[^ ]+' | head -n 1)
 
         if [[ -n "$UPLOAD_LINK" ]]; then
-            send_telegram "📦 <b>Build Uploaded!</b>
+            send_telegram_button "📦 <b>Build Uploaded!</b>
 <b>ROM:</b> $BUILD_TARGET
-<b>Device:</b> $DEVICE_CODE
-<b>Link:</b> <a href='$UPLOAD_LINK'>Download</a>"
+<b>Device:</b> $DEVICE_CODE" "$UPLOAD_LINK"
         else
             send_telegram "❌ <b>Upload failed!</b>
 <pre>$UPLOAD_OUTPUT</pre>"
